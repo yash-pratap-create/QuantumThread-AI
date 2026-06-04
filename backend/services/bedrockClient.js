@@ -46,6 +46,8 @@ async function callBedrock(prompt, opts = {}) {
         model: MODEL,
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
+      }, {
+        timeout: 25000 // 25s timeout to prevent hanging requests
       });
 
       const text = response.content?.[0]?.text || "No response from Claude.";

@@ -1,9 +1,9 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const serverless = require("serverless-http");
 const { initializeDatabase, dbGet, dbRun, dbAll } = require("./db");
-const { isS3Enabled, listProjectsFromS3 } = require("./services/s3Storage");
+const { isS3Enabled, listProjectsFromS3, loadIntelligenceFromS3 } = require("./services/s3Storage");
 
 const projectsRouter = require("./routes/projects");
 const chatRouter = require("./routes/chat");
@@ -92,6 +92,89 @@ app.use((err, req, res, _next) => {
 });
 
 
+// Helper to restore S3 cached intelligence JSON back into local SQLite tables
+async function restoreIntelligenceData(repoName, cache) {
+  try {
+    // Clear any existing data for safety
+    await dbRun("DELETE FROM modules WHERE repository = ?", [repoName]);
+    await dbRun("DELETE FROM vulnerabilities WHERE repository = ?", [repoName]);
+    await dbRun("DELETE FROM dependencies WHERE repository = ?", [repoName]);
+    await dbRun("DELETE FROM time_periods WHERE repository = ?", [repoName]);
+    await dbRun("DELETE FROM architecture_nodes WHERE repository = ?", [repoName]);
+    await dbRun("DELETE FROM architecture_edges WHERE repository = ?", [repoName]);
+
+    // Restore modules
+    if (Array.isArray(cache.modules)) {
+      for (const m of cache.modules) {
+        await dbRun(
+          `INSERT INTO modules (name, risk_score, risk_level, bug_count, dependency_count, impact_radius, last_modified, bugs, ai_summary, repository)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [m.name, m.risk_score, m.risk_level, m.bug_count, m.dependency_count, m.impact_radius, m.last_modified, m.bugs, m.ai_summary, repoName]
+        );
+      }
+    }
+
+    // Restore vulnerabilities
+    if (Array.isArray(cache.vulnerabilities)) {
+      for (const v of cache.vulnerabilities) {
+        await dbRun(
+          `INSERT INTO vulnerabilities (cve, severity, exploitability, affected_versions, library, patch_version, description, affected_modules, dependency_chain, repository)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [v.cve, v.severity, v.exploitability, v.affected_versions, v.library, v.patch_version, v.description, v.affected_modules, v.dependency_chain, repoName]
+        );
+      }
+    }
+
+    // Restore dependencies
+    if (Array.isArray(cache.dependencies)) {
+      for (const d of cache.dependencies) {
+        await dbRun(
+          `INSERT INTO dependencies (module, incoming_count, outgoing_count, gravity, depth, circular_deps, implicit_deps, fan_in, fan_out, volatility, chain, transitive_exposure, direct_deps, reverse_deps, repository)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [d.module, d.incoming_count, d.outgoing_count, d.gravity, d.depth, d.circular_deps, d.implicit_deps, d.fan_in, d.fan_out, d.volatility, d.chain, d.transitive_exposure, d.direct_deps, d.reverse_deps, repoName]
+        );
+      }
+    }
+
+    // Restore time_periods (evolution data)
+    if (Array.isArray(cache.time_periods)) {
+      for (const t of cache.time_periods) {
+        await dbRun(
+          `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [t.version, t.date, t.risk_score, t.vulnerability_accumulation, t.dependency_count, t.entropy, t.modules_changed, t.commit_count, t.avg_commit_size, t.code_churn, t.days_to_release, t.breaking_changes, t.bugs_fixed, t.feature_count, repoName]
+        );
+      }
+    }
+
+    // Restore architecture nodes
+    if (Array.isArray(cache.architecture_nodes)) {
+      for (const n of cache.architecture_nodes) {
+        await dbRun(
+          `INSERT INTO architecture_nodes (node_id, repository, position_x, position_y, label, risk, load, risk_score)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [n.node_id, repoName, n.position_x, n.position_y, n.label, n.risk, n.load, n.risk_score]
+        );
+      }
+    }
+
+    // Restore architecture edges
+    if (Array.isArray(cache.architecture_edges)) {
+      for (const e of cache.architecture_edges) {
+        await dbRun(
+          `INSERT INTO architecture_edges (edge_id, repository, source, target, animated, stroke, stroke_width)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [e.edge_id, repoName, e.source, e.target, e.animated, e.stroke, e.stroke_width]
+        );
+      }
+    }
+
+    console.log(`☁️  Restored intelligence data from S3 cache for "${repoName}"`);
+  } catch (err) {
+    console.error(`⚠️  Failed to restore intelligence data cache for ${repoName}:`, err.message);
+  }
+}
+
 // On Render, SQLite is wiped on every restart. Re-register any projects found in S3.
 async function restoreProjectsFromS3() {
   if (!isS3Enabled()) return;
@@ -108,6 +191,14 @@ async function restoreProjectsFromS3() {
         );
         restored++;
         console.log(`☁️  Restored from S3: ${p.name} (id=${p.id})`);
+
+        // Load intelligence cache from S3 and populate SQLite
+        const cache = await loadIntelligenceFromS3(p.id).catch(() => null);
+        if (cache) {
+          await restoreIntelligenceData(p.name, cache);
+        } else {
+          console.log(`⚠️  No intelligence cache found in S3 for ${p.name} (id=${p.id})`);
+        }
       }
     }
     // Keep sqlite_sequence in sync so new project IDs don't collide

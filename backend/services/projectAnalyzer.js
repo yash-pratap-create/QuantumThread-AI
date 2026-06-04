@@ -42,8 +42,22 @@ function collectFiles(dir, baseDir = dir) {
           try {
             const stat = fs.statSync(fullPath);
             if (stat.size < 200000) { // skip files > 200KB
-              const content = fs.readFileSync(fullPath, "utf-8");
-              results.push({ path: relativePath, ext, content, size: stat.size });
+              results.push({
+                path: relativePath,
+                fullPath,
+                ext,
+                size: stat.size,
+                get content() {
+                  if (this._content === undefined) {
+                    try {
+                      this._content = fs.readFileSync(this.fullPath, "utf-8");
+                    } catch {
+                      this._content = "";
+                    }
+                  }
+                  return this._content;
+                }
+              });
             }
           } catch { /* skip unreadable */ }
         }
@@ -438,6 +452,30 @@ Create edges that reflect real imports, data flow, and dependencies in the code.
 
   console.log(`📊 [Analyzer] Architecture: ${archNodes.length} nodes, ${archEdges.length} edges`);
   console.log(`📊 [Analyzer] ✅ Analysis complete for "${projectName}"\n`);
+
+  // --- CACHE INTELLIGENCE DATA TO S3 ---
+  try {
+    const modules = await dbAll("SELECT * FROM modules WHERE repository = ?", [projectName]);
+    const vulnerabilities = await dbAll("SELECT * FROM vulnerabilities WHERE repository = ?", [projectName]);
+    const dependencies = await dbAll("SELECT * FROM dependencies WHERE repository = ?", [projectName]);
+    const time_periods = await dbAll("SELECT * FROM time_periods WHERE repository = ?", [projectName]);
+    const architecture_nodes = await dbAll("SELECT * FROM architecture_nodes WHERE repository = ?", [projectName]);
+    const architecture_edges = await dbAll("SELECT * FROM architecture_edges WHERE repository = ?", [projectName]);
+
+    const cacheData = {
+      modules,
+      vulnerabilities,
+      dependencies,
+      time_periods,
+      architecture_nodes,
+      architecture_edges
+    };
+
+    await saveIntelligenceToS3(projectId, cacheData);
+    console.log(`📊 [Analyzer] Saved intelligence cache to S3 for "${projectName}" (id=${projectId})`);
+  } catch (s3CacheErr) {
+    console.error("📊 [Analyzer] S3 intelligence cache failed:", s3CacheErr.message);
+  }
 
   return { modules: moduleList.length, files: files.length };
 }

@@ -173,8 +173,23 @@ function initializeDatabase() {
             console.error("❌ Error creating tables:", err.message);
             reject(err);
           } else {
-            console.log("✅ All database tables ready");
-            resolve();
+            // Create indexes for faster repository-specific lookups (optimize project switches)
+            db.serialize(() => {
+              db.run("CREATE INDEX IF NOT EXISTS idx_modules_repo ON modules(repository)");
+              db.run("CREATE INDEX IF NOT EXISTS idx_vulnerabilities_repo ON vulnerabilities(repository)");
+              db.run("CREATE INDEX IF NOT EXISTS idx_dependencies_repo ON dependencies(repository)");
+              db.run("CREATE INDEX IF NOT EXISTS idx_time_periods_repo ON time_periods(repository)");
+              db.run("CREATE INDEX IF NOT EXISTS idx_arch_nodes_repo ON architecture_nodes(repository)");
+              db.run("CREATE INDEX IF NOT EXISTS idx_arch_edges_repo ON architecture_edges(repository)", (indexErr) => {
+                if (indexErr) {
+                  console.error("❌ Error creating indexes:", indexErr.message);
+                  reject(indexErr);
+                } else {
+                  console.log("✅ All database tables and indexes ready");
+                  resolve();
+                }
+              });
+            });
           }
         }
       );
