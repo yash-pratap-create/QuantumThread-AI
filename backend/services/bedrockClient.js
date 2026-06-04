@@ -35,7 +35,35 @@ if (isAnthropicEnabled) {
     config.credentials = { accessKeyId, secretAccessKey };
   }
   bedrockClient = new BedrockRuntimeClient(config);
-  console.log(`☁️  AI Engine: AWS Bedrock (model: ${BEDROCK_MODEL}, region: ${REGION})`);
+
+  // Check if we are using a Bedrock API Key (either via BEDROCK_API_KEY starting with ABSK,
+  // or via accessKeyId starting with 'BedrockAPIKey-')
+  let abskToken = process.env.BEDROCK_API_KEY;
+  if (abskToken && !abskToken.startsWith("ABSK")) {
+    abskToken = null;
+  }
+  if (!abskToken && accessKeyId && accessKeyId.startsWith("BedrockAPIKey-") && secretAccessKey) {
+    abskToken = "ABSK" + Buffer.from(`${accessKeyId}:${secretAccessKey}`).toString("base64");
+  }
+
+  if (abskToken) {
+    console.log(`☁️  AI Engine: AWS Bedrock (model: ${BEDROCK_MODEL}, region: ${REGION}) using API Key`);
+    bedrockClient.middlewareStack.add(
+      (next, context) => async (args) => {
+        delete args.request.headers["authorization"];
+        delete args.request.headers["Authorization"];
+        args.request.headers["Authorization"] = `Bearer ${abskToken}`;
+        return next(args);
+      },
+      {
+        step: "finalizeRequest",
+        name: "bearerTokenMiddleware",
+        priority: "high"
+      }
+    );
+  } else {
+    console.log(`☁️  AI Engine: AWS Bedrock (model: ${BEDROCK_MODEL}, region: ${REGION}) using IAM SigV4`);
+  }
 }
 
 function sleep(ms) {
