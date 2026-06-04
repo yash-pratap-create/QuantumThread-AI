@@ -19,6 +19,7 @@ const useIntelligenceStore = create((set, get) => ({
   timePeriods: [],
   architecture: { nodes: [], edges: [] },
   summary: null,
+  cache: {},
 
   // ==================== LOADING STATE ====================
   loading: false,
@@ -31,10 +32,12 @@ const useIntelligenceStore = create((set, get) => ({
   selectedVersion: "Current",
 
   // ==================== DATA FETCHING ====================
-  fetchAll: async (repo) => {
+  fetchAll: async (repo, isSilent = false) => {
     const repository = repo || get().selectedRepository;
     if (!repository) return;
-    set({ loading: true, error: null });
+    if (!isSilent) {
+      set({ loading: true, error: null });
+    }
     try {
       const [modules, vulnerabilities, dependencies, timePeriods, architecture, summary] =
         await Promise.all([
@@ -45,6 +48,19 @@ const useIntelligenceStore = create((set, get) => ({
           fetchArchitecture(repository),
           fetchSummary(repository),
         ]);
+
+      const updatedCache = {
+        ...get().cache,
+        [repository]: {
+          modules,
+          vulnerabilities,
+          dependencies,
+          timePeriods,
+          architecture,
+          summary,
+        }
+      };
+
       set({
         modules,
         vulnerabilities,
@@ -52,12 +68,15 @@ const useIntelligenceStore = create((set, get) => ({
         timePeriods,
         architecture,
         summary,
+        cache: updatedCache,
         loading: false,
         initialized: true,
       });
     } catch (err) {
       console.error("Failed to fetch intelligence data:", err);
-      set({ error: err.message, loading: false });
+      if (!isSilent) {
+        set({ error: err.message, loading: false });
+      }
     }
   },
 
@@ -198,8 +217,34 @@ const useIntelligenceStore = create((set, get) => ({
   // ==================== ACTIONS ====================
   setSelectedRepository: (repo) => {
     set({ selectedRepository: repo });
-    // Re-fetch data for the new repository
-    get().fetchAll(repo);
+    
+    // Check if we have cached data for this repository
+    const cachedData = get().cache[repo];
+    if (cachedData) {
+      // Immediately set the state to cached data so UI doesn't show a loader
+      set({
+        modules: cachedData.modules || [],
+        vulnerabilities: cachedData.vulnerabilities || [],
+        dependencies: cachedData.dependencies || [],
+        timePeriods: cachedData.timePeriods || [],
+        architecture: cachedData.architecture || { nodes: [], edges: [] },
+        summary: cachedData.summary || null,
+      });
+    } else {
+      // No cache, we must show a loader and clear old data
+      set({
+        modules: [],
+        vulnerabilities: [],
+        dependencies: [],
+        timePeriods: [],
+        architecture: { nodes: [], edges: [] },
+        summary: null,
+        loading: true,
+      });
+    }
+
+    // Always fetch in the background to sync with the backend
+    get().fetchAll(repo, !!cachedData);
   },
   setSelectedBranch: (branch) => set({ selectedBranch: branch }),
   setSelectedVersion: (version) => set({ selectedVersion: version }),

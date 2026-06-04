@@ -4,6 +4,7 @@ const cors = require("cors");
 const serverless = require("serverless-http");
 const { initializeDatabase, dbGet, dbRun, dbAll } = require("./db");
 const { isS3Enabled, listProjectsFromS3, loadIntelligenceFromS3 } = require("./services/s3Storage");
+const { generateEvolutionTimeline } = require("./services/evolutionTimeline");
 
 const projectsRouter = require("./routes/projects");
 const chatRouter = require("./routes/chat");
@@ -149,37 +150,14 @@ async function restoreIntelligenceData(repoName, cache) {
       const totalBugCount = modulesList.reduce((sum, m) => sum + (m.bug_count || 0), 0);
       const avgEntropyScore = modulesList.length > 0 ? (totalBugCount * 0.1 / modulesList.length) : 0;
 
-      const versions = [
-        { version: "v1.0.0", offsetDays: 35, riskMultiplier: 1.3, vulnMultiplier: 0.5, depMultiplier: 0.6, entropyMultiplier: 0.7, commitBase: 120, churnBase: 12000, features: 12, bugs: 22 },
-        { version: "v1.1.0", offsetDays: 28, riskMultiplier: 1.2, vulnMultiplier: 0.7, depMultiplier: 0.7, entropyMultiplier: 0.8, commitBase: 95,  churnBase: 8500,  features: 8,  bugs: 15 },
-        { version: "v1.2.0", offsetDays: 21, riskMultiplier: 1.15, vulnMultiplier: 0.8, depMultiplier: 0.8, entropyMultiplier: 0.95, commitBase: 140, churnBase: 15000, features: 15, bugs: 30 },
-        { version: "v1.3.0", offsetDays: 14, riskMultiplier: 1.05, vulnMultiplier: 1.1, depMultiplier: 0.9, entropyMultiplier: 1.1, commitBase: 80,  churnBase: 6000,  features: 6,  bugs: 12 },
-        { version: "v1.4.0", offsetDays: 7,  riskMultiplier: 1.02, vulnMultiplier: 0.9, depMultiplier: 0.95, entropyMultiplier: 1.05, commitBase: 110, churnBase: 9800,  features: 10, bugs: 18 },
-        { version: "Current", offsetDays: 0,  riskMultiplier: 1.0,  vulnMultiplier: 1.0, depMultiplier: 1.0,  entropyMultiplier: 1.0,  commitBase: 70,  churnBase: 5000,  features: 5,  bugs: 8 }
-      ];
-
-      const now = new Date();
-      timePeriodsToInsert = versions.map(v => {
-        const periodDate = new Date(now.getTime() - v.offsetDays * 24 * 60 * 60 * 1000);
-        const dateStr = periodDate.toISOString().split("T")[0];
-
-        return {
-          version: v.version,
-          date: dateStr,
-          risk_score: Math.max(0, Math.min(100, Math.round(avgRiskScore * v.riskMultiplier))),
-          vulnerability_accumulation: Math.max(0, Math.round(vulnsCount * v.vulnMultiplier)),
-          dependency_count: Math.max(0, Math.round(depsCount * v.depMultiplier)),
-          entropy: Number((avgEntropyScore * v.entropyMultiplier).toFixed(2)),
-          modules_changed: Math.max(1, Math.round(modulesList.length * (0.2 + Math.random() * 0.3))),
-          commit_count: v.commitBase,
-          avg_commit_size: Math.round(v.churnBase / v.commitBase),
-          code_churn: v.churnBase,
-          days_to_release: Math.max(1, Math.round(v.offsetDays / 5) + 3),
-          breaking_changes: Math.round(v.features * 0.2),
-          bugs_fixed: v.bugs,
-          feature_count: v.features
-        };
-      });
+      timePeriodsToInsert = generateEvolutionTimeline(
+        repoName,
+        modulesList.length,
+        vulnsCount,
+        depsCount,
+        avgRiskScore,
+        avgEntropyScore
+      );
     }
 
     for (const t of timePeriodsToInsert) {

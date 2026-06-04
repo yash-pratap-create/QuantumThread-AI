@@ -317,6 +317,7 @@ function Layout({ mode = "project" }) {
                           const s = await fetchProjectStatus(selectedProject.id);
                           if (s.status === "ready") {
                             setProjects((prev) => prev.map((p) => p.id === selectedProject.id ? { ...p, status: "ready" } : p));
+                            useIntelligenceStore.getState().fetchAll(selectedProject.name);
                           } else if (s.status === "error") {
                             alert("Re-analysis failed.");
                             setProjects((prev) => prev.map((p) => p.id === selectedProject.id ? { ...p, status: "error" } : p));

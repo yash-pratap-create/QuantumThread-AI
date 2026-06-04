@@ -8,6 +8,7 @@ const path = require("path");
 const { dbRun, dbAll } = require("../db");
 const { callBedrock } = require("./bedrockClient");
 const { saveIntelligenceToS3 } = require("./s3Storage");
+const { generateEvolutionTimeline } = require("./evolutionTimeline");
 
 const CODE_EXTENSIONS = new Set([
   ".js", ".jsx", ".ts", ".tsx", ".py", ".java", ".go", ".rs",
@@ -464,50 +465,39 @@ Create edges that reflect real imports, data flow, and dependencies in the code.
     const totalBugCount = activeModules.reduce((sum, m) => sum + (m.bug_count || 0), 0);
     const avgEntropyScore = activeModules.length > 0 ? (totalBugCount * 0.1 / activeModules.length) : 0;
 
-    // Generate 6 historical versions leading to current
-    const versions = [
-      { version: "v1.0.0", offsetDays: 35, riskMultiplier: 1.3, vulnMultiplier: 0.5, depMultiplier: 0.6, entropyMultiplier: 0.7, commitBase: 120, churnBase: 12000, features: 12, bugs: 22 },
-      { version: "v1.1.0", offsetDays: 28, riskMultiplier: 1.2, vulnMultiplier: 0.7, depMultiplier: 0.7, entropyMultiplier: 0.8, commitBase: 95,  churnBase: 8500,  features: 8,  bugs: 15 },
-      { version: "v1.2.0", offsetDays: 21, riskMultiplier: 1.15, vulnMultiplier: 0.8, depMultiplier: 0.8, entropyMultiplier: 0.95, commitBase: 140, churnBase: 15000, features: 15, bugs: 30 },
-      { version: "v1.3.0", offsetDays: 14, riskMultiplier: 1.05, vulnMultiplier: 1.1, depMultiplier: 0.9, entropyMultiplier: 1.1, commitBase: 80,  churnBase: 6000,  features: 6,  bugs: 12 },
-      { version: "v1.4.0", offsetDays: 7,  riskMultiplier: 1.02, vulnMultiplier: 0.9, depMultiplier: 0.95, entropyMultiplier: 1.05, commitBase: 110, churnBase: 9800,  features: 10, bugs: 18 },
-      { version: "Current", offsetDays: 0,  riskMultiplier: 1.0,  vulnMultiplier: 1.0, depMultiplier: 1.0,  entropyMultiplier: 1.0,  commitBase: 70,  churnBase: 5000,  features: 5,  bugs: 8 }
-    ];
+    const timeline = generateEvolutionTimeline(
+      projectName,
+      activeModules.length,
+      totalVulnsCount,
+      totalDepsCount,
+      avgRiskScore,
+      avgEntropyScore
+    );
 
-    const now = new Date();
-    for (const v of versions) {
-      const periodDate = new Date(now.getTime() - v.offsetDays * 24 * 60 * 60 * 1000);
-      const dateStr = periodDate.toISOString().split("T")[0];
-
-      const periodRisk = clamp(Math.round(avgRiskScore * v.riskMultiplier), 0, 100);
-      const periodVulns = Math.max(0, Math.round(totalVulnsCount * v.vulnMultiplier));
-      const periodDeps = Math.max(0, Math.round(totalDepsCount * v.depMultiplier));
-      const periodEntropy = Number((avgEntropyScore * v.entropyMultiplier).toFixed(2));
-      const modulesChanged = Math.max(1, Math.round(activeModules.length * (0.2 + Math.random() * 0.3)));
-
+    for (const t of timeline) {
       await dbRun(
         `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          v.version,
-          dateStr,
-          periodRisk,
-          periodVulns,
-          periodDeps,
-          periodEntropy,
-          modulesChanged,
-          v.commitBase,
-          Math.round(v.churnBase / v.commitBase),
-          v.churnBase,
-          Math.max(1, Math.round(v.offsetDays / 5) + 3),
-          Math.round(v.features * 0.2),
-          v.bugs,
-          v.features,
+          t.version,
+          t.date,
+          t.risk_score,
+          t.vulnerability_accumulation,
+          t.dependency_count,
+          t.entropy,
+          t.modules_changed,
+          t.commit_count,
+          t.avg_commit_size,
+          t.code_churn,
+          t.days_to_release,
+          t.breaking_changes,
+          t.bugs_fixed,
+          t.feature_count,
           projectName
         ]
       );
     }
-    console.log(`📊 [Analyzer] Generated ${versions.length} evolution time periods`);
+    console.log(`📊 [Analyzer] Generated ${timeline.length} evolution time periods`);
   } catch (timelineErr) {
     console.error("📊 [Analyzer] Evolution timeline generation failed:", timelineErr.message);
   }
