@@ -13,7 +13,7 @@ const isAnthropicEnabled = ANTHROPIC_KEY &&
   !String(ANTHROPIC_KEY).includes("your_anthropic");
 
 const REGION = process.env.AWS_REGION || "us-east-1";
-const BEDROCK_MODEL = process.env.BEDROCK_MODEL || "meta.llama3-70b-instruct-v1:0";
+const BEDROCK_MODEL = process.env.BEDROCK_MODEL || "arn:aws:bedrock:us-east-1:857294630609:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0";
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5";
 
 const MAX_RETRIES = 3;
@@ -99,7 +99,7 @@ async function callBedrock(prompt, opts = {}) {
         return text.trim();
       } else {
         console.log(`[BedrockClient] Calling ${BEDROCK_MODEL} (attempt ${attempt + 1})`);
-        const command = new ConverseCommand({
+        const commandParams = {
           modelId: BEDROCK_MODEL,
           messages: [{ role: "user", content: [{ text: prompt }] }],
           inferenceConfig: {
@@ -107,7 +107,12 @@ async function callBedrock(prompt, opts = {}) {
             temperature: 0.7,
             topP: 0.9,
           },
-        });
+        };
+        if (BEDROCK_MODEL.toLowerCase().includes("claude")) {
+          commandParams.additionalModelRequestFields = { top_k: 250 };
+          commandParams.performanceConfig = { latency: "standard" };
+        }
+        const command = new ConverseCommand(commandParams);
         const response = await bedrockClient.send(command);
         const text = response.output?.message?.content?.[0]?.text || "No response from Bedrock.";
         console.log(`[BedrockClient] Response received (${text.length} chars)`);
