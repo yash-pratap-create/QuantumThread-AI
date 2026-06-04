@@ -369,6 +369,8 @@ function CodeAssistant() {
           <div className="flex items-end gap-3">
             <div className="flex-1 relative">
               <textarea
+                id="assistant-prompt-input"
+                name="assistant-prompt-input"
                 ref={inputRef}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}

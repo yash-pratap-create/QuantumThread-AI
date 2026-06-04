@@ -245,9 +245,12 @@ function Layout({ mode = "project" }) {
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]"
                   />
                   <input
+                    id="conversation-search"
+                    name="conversation-search"
                     className="w-full pl-10 pr-4 py-1.5 bg-white/[0.06] border border-white/[0.06] rounded-md text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 placeholder-slate-500"
                     placeholder="Search conversations..."
                     type="text"
+                    autoComplete="off"
                   />
                 </div>
               </>
@@ -257,6 +260,8 @@ function Layout({ mode = "project" }) {
             {/* Project Selector Dropdown */}
             <div className="flex items-center gap-2">
               <select
+                id="project-select"
+                name="project-select"
                 value={selectedProjectId || ""}
                 onChange={(e) => setSelectedProjectId(Number(e.target.value))}
                 className="flex items-center gap-2 px-3 py-1.5 border border-white/[0.06] rounded text-sm font-medium bg-white/[0.06] text-slate-300 hover:bg-white/[0.08] transition-colors cursor-pointer"
@@ -348,9 +353,12 @@ function Layout({ mode = "project" }) {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]"
               />
               <input
+                id="architecture-search"
+                name="architecture-search"
                 className="w-full pl-10 pr-4 py-1.5 bg-white/[0.06] border border-white/[0.06] rounded-md text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 placeholder-slate-500"
                 placeholder="Search architecture, files, or agents..."
                 type="text"
+                autoComplete="off"
               />
             </div>
               </>
@@ -585,6 +593,8 @@ function NewProjectModal({ onClose, onCreated }) {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <input
+                      id="project-file-upload"
+                      name="project-file-upload"
                       ref={fileInputRef}
                       type="file"
                       accept=".zip"
@@ -626,11 +636,14 @@ function NewProjectModal({ onClose, onCreated }) {
                       Repository URL
                     </label>
                     <input
+                      id="github-url-input"
+                      name="github-url-input"
                       value={githubUrl}
                       onChange={(e) => setGithubUrl(e.target.value)}
                       placeholder="https://github.com/user/repo"
                       className="w-full px-4 py-2.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all"
                       autoFocus
+                      autoComplete="off"
                     />
                     <p className="text-[10px] text-slate-500 mt-1.5">Public repositories only. We'll clone and analyze the code.</p>
                   </div>
@@ -865,12 +878,15 @@ function ProjectChatPanel({ selectedProject }) {
             <div className="shrink-0 border-t border-white/[0.04] px-4 py-2.5" style={{ background: "rgba(255,255,255,0.04)" }}>
               <div className="flex items-center gap-2">
                 <input
+                  id="chat-prompt-input"
+                  name="chat-prompt-input"
                   ref={inputRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask about architecture, bugs, security..."
                   className="flex-1 px-3 py-2 bg-white/[0.06] border border-white/[0.06] rounded-lg text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-transparent placeholder-slate-500"
+                  autoComplete="off"
                 />
                 <button
                   onClick={handleSubmit}
