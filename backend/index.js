@@ -116,6 +116,16 @@ async function restoreIntelligenceData(repoName, cache) {
 
     // Restore time_periods (evolution data)
     let timePeriodsToInsert = cache.time_periods;
+    if (!timePeriodsToInsert || timePeriodsToInsert.length === 0) {
+      const modulesList = Array.isArray(cache.modules) ? cache.modules : [];
+      const vulnsCount = Array.isArray(cache.vulnerabilities) ? cache.vulnerabilities.length : 0;
+      const depsCount = Array.isArray(cache.dependencies) ? cache.dependencies.length : 0;
+
+      const totalRiskScore = modulesList.reduce((sum, m) => sum + (m.risk_score || 0), 0);
+      const avgRiskScore = modulesList.length > 0 ? Math.round(totalRiskScore / modulesList.length) : 0;
+      const totalBugCount = modulesList.reduce((sum, m) => sum + (m.bug_count || 0), 0);
+      const avgEntropyScore = modulesList.length > 0 ? (totalBugCount * 0.1 / modulesList.length) : 0;
+
       timePeriodsToInsert = generateEvolutionTimeline(
         repoName,
         modulesList.length,
@@ -128,9 +138,9 @@ async function restoreIntelligenceData(repoName, cache) {
 
     for (const t of timePeriodsToInsert) {
       await dbRun(
-        `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [t.version, t.date, t.risk_score, t.vulnerability_accumulation, t.dependency_count, t.entropy, t.modules_changed, t.commit_count, t.avg_commit_size, t.code_churn, t.days_to_release, t.breaking_changes, t.bugs_fixed, t.feature_count, repoName]
+        `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository, commit_hash, author)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [t.version, t.date, t.risk_score, t.vulnerability_accumulation, t.dependency_count, t.entropy, t.modules_changed, t.commit_count, t.avg_commit_size, t.code_churn, t.days_to_release, t.breaking_changes, t.bugs_fixed, t.feature_count, repoName, t.commit_hash, t.author]
       );
     }
 

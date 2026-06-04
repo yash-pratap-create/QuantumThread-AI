@@ -1,10 +1,39 @@
+const { execSync } = require('child_process');
+
 /**
  * Unique Evolution Timeline Generator
- * Generates deterministic, unique timeline records based on a repository name
- * and its size characteristics (module count, vuln count, dep count).
+ * Generates deterministic, unique timeline records based on a repository name.
+ * If projectDir is provided and is a valid Git repository, extracts real
+ * commit history (hashes, authors, and dates) instead of simulated dates.
  */
 
-function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount, avgRiskScore, avgEntropyScore) {
+function fetchGitHistory(projectDir) {
+  if (!projectDir) return null;
+  try {
+    // Check if it's a valid git repo
+    execSync('git rev-parse --is-inside-work-tree', { cwd: projectDir, stdio: 'ignore' });
+    
+    // Get last 6 commits (first-parent to simplify history)
+    const logOutput = execSync('git log -n 6 --pretty=format:"%H|%cI|%an|%s" --first-parent', { cwd: projectDir, encoding: 'utf-8' });
+    if (!logOutput.trim()) return null;
+
+    const lines = logOutput.trim().split('\n').filter(Boolean);
+    const commits = lines.map(line => {
+      const parts = line.split('|');
+      return {
+        hash: parts[0],
+        date: parts[1],
+        author: parts[2],
+        message: parts.slice(3).join('|')
+      };
+    });
+    return commits;
+  } catch (err) {
+    return null;
+  }
+}
+
+function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount, avgRiskScore, avgEntropyScore, projectDir = null) {
   // 1. Generate a deterministic seed from repoName
   let seed = 0;
   for (let i = 0; i < repoName.length; i++) {
@@ -16,7 +45,6 @@ function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount
   const clamp = (val, min, max) => Math.max(min, Math.min(max, Number(val) || 0));
 
   // 2. Base metrics scaled by project size (modulesCount)
-  // Smaller projects should have fewer commits/churn, larger projects should have more.
   const scaleMultiplier = clamp(modulesCount / 5, 0.4, 5.0);
 
   // 3. Define the base versions
@@ -30,9 +58,28 @@ function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount
   ];
 
   const now = new Date();
+  const realCommits = fetchGitHistory(projectDir);
+
   return versions.map((v, index) => {
-    const periodDate = new Date(now.getTime() - v.offsetDays * 24 * 60 * 60 * 1000);
-    const dateStr = periodDate.toISOString().split("T")[0];
+    let periodDate = new Date(now.getTime() - v.offsetDays * 24 * 60 * 60 * 1000);
+    let dateStr = periodDate.toISOString().split("T")[0];
+    let commit_hash = null;
+    let author = null;
+    let versionLabel = v.version;
+
+    // Use real git history if available
+    // realCommits[0] is newest. versions[5] is newest ("Current").
+    // So index maps to realCommits[5 - index].
+    if (realCommits && realCommits.length > 0) {
+      const commitIndex = Math.min(5 - index, realCommits.length - 1);
+      const commit = realCommits[commitIndex];
+      if (commit) {
+        commit_hash = commit.hash;
+        author = commit.author;
+        dateStr = commit.date.split("T")[0]; // use real date
+        versionLabel = commit.hash.substring(0, 7); // Use short hash as version
+      }
+    }
 
     // Introduce deterministic fluctuation using seed and version index
     const versionSeed = seed + index * 107;
@@ -51,7 +98,7 @@ function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount
     const modules_changed = clamp(Math.round(modulesCount * (0.2 + noise * 0.3)), 1, modulesCount);
 
     return {
-      version: v.version,
+      version: versionLabel,
       date: dateStr,
       risk_score,
       vulnerability_accumulation,
@@ -64,7 +111,9 @@ function generateEvolutionTimeline(repoName, modulesCount, vulnsCount, depsCount
       days_to_release: Math.max(1, Math.round(v.offsetDays / 5) + 3),
       breaking_changes: Math.round(featureCount * 0.2),
       bugs_fixed: bugsFixed,
-      feature_count: featureCount
+      feature_count: featureCount,
+      commit_hash,
+      author
     };
   });
 }

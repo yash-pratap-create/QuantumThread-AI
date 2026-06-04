@@ -471,13 +471,14 @@ Create edges that reflect real imports, data flow, and dependencies in the code.
       totalVulnsCount,
       totalDepsCount,
       avgRiskScore,
-      avgEntropyScore
+      avgEntropyScore,
+      projectDir
     );
 
     for (const t of timeline) {
       await dbRun(
-        `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO time_periods (version, date, risk_score, vulnerability_accumulation, dependency_count, entropy, modules_changed, commit_count, avg_commit_size, code_churn, days_to_release, breaking_changes, bugs_fixed, feature_count, repository, commit_hash, author)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           t.version,
           t.date,
@@ -493,7 +494,9 @@ Create edges that reflect real imports, data flow, and dependencies in the code.
           t.breaking_changes,
           t.bugs_fixed,
           t.feature_count,
-          projectName
+          projectName,
+          t.commit_hash,
+          t.author
         ]
       );
     }

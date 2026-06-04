@@ -28,6 +28,8 @@ function initializeDatabase() {
       db.run(`ALTER TABLE projects ADD COLUMN source_path TEXT`, () => { });
       db.run(`ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'ready'`, () => { });
       db.run(`ALTER TABLE projects ADD COLUMN s3_key TEXT`, () => { });
+      db.run(`ALTER TABLE time_periods ADD COLUMN commit_hash TEXT`, () => { });
+      db.run(`ALTER TABLE time_periods ADD COLUMN author TEXT`, () => { });
 
       db.run(`
         CREATE TABLE IF NOT EXISTS chat_history (
@@ -137,7 +139,9 @@ function initializeDatabase() {
           breaking_changes INTEGER DEFAULT 0,
           bugs_fixed INTEGER DEFAULT 0,
           feature_count INTEGER DEFAULT 0,
-          repository TEXT DEFAULT ''
+          repository TEXT DEFAULT '',
+          commit_hash TEXT,
+          author TEXT
         )
       `);
 

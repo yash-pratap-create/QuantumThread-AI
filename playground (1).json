@@ -1,0 +1,66 @@
+[
+  [
+    {
+      "id": "f8aab15a-fb72-4c60-818c-9d329210580d",
+      "source": 1,
+      "content": [
+        {
+          "type": "text",
+          "text": "?"
+        }
+      ],
+      "reasoningContent": [],
+      "citation": [],
+      "timestamp": "2026-06-04T18:18:31.738Z",
+      "metadata": {
+        "inferenceConfig": {
+          "maxTokenCount": 512,
+          "stopSequences": [],
+          "temperature": 0.7,
+          "topP": 0.9,
+          "guardrailId": "",
+          "guardrailVersion": "",
+          "modelId": "amazon.nova-lite-v1:0"
+        },
+        "modelId": "amazon.nova-lite-v1:0"
+      },
+      "state": "completed",
+      "config": {
+        "isOptimized": false
+      }
+    },
+    {
+      "id": "645699c4-61a3-4ff2-a2fb-38e4ebf1bc2e",
+      "source": 2,
+      "content": [
+        {
+          "type": "text",
+          "text": "It looks like your message was just a question mark, so I'm not sure what you're asking. If you have a specific topic or question in mind, feel free to share it! Whether it's about science, technology, history, or something else, I'm here to help. Here are a few examples of questions you might ask:\n\n- \"How does photosynthesis work?\"\n- \"What are the latest advancements in artificial intelligence?\"\n- \"Can you explain the theory of relativity?\"\n- \"What are some effective study techniques?\"\n\nLet me know how you'd like to proceed!"
+        }
+      ],
+      "reasoningContent": [],
+      "citation": [],
+      "timestamp": "2026-06-04T18:18:31.738Z",
+      "metadata": {
+        "inferenceConfig": {
+          "maxTokenCount": 512,
+          "stopSequences": [],
+          "temperature": 0.7,
+          "topP": 0.9,
+          "guardrailId": "",
+          "guardrailVersion": "",
+          "modelId": "amazon.nova-lite-v1:0"
+        },
+        "modelId": "amazon.nova-lite-v1:0",
+        "metrics": {
+          "isLoading": false,
+          "latency": 1099,
+          "inputTokenCount": 2,
+          "outputTokenCount": 122
+        }
+      },
+      "toolUse": [],
+      "state": "completed"
+    }
+  ]
+]
