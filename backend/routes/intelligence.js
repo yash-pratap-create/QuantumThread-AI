@@ -336,6 +336,8 @@ router.get("/architecture", async (req, res) => {
       [repo]
     );
 
+    console.log(`[Architecture API] repo="${repo}" → ${nodeRows.length} nodes, ${edgeRows.length} edges`);
+
     const nodes = nodeRows.map((r) => ({
       id: r.node_id,
       position: { x: r.position_x, y: r.position_y },

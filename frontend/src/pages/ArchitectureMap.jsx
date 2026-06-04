@@ -98,10 +98,17 @@ function ArchitectureMap() {
 
   // Fetch architecture data when repository changes
   useEffect(() => {
+    if (!selectedRepository) {
+      setArchNodes([]);
+      setArchEdges([]);
+      return;
+    }
     let cancelled = false;
     async function load() {
       try {
+        console.log("ArchitectureMap: fetching architecture for repo:", selectedRepository);
         const data = await fetchArchitecture(selectedRepository);
+        console.log("ArchitectureMap: API response — nodes:", data.nodes?.length, "edges:", data.edges?.length);
         if (!cancelled) {
           const formattedNodes = (data.nodes || []).map((n) => ({
             ...n,
@@ -118,6 +125,7 @@ function ArchitectureMap() {
           // If the DB has no edges yet, synthesise a connected graph from the nodes
           // so the Architecture Map is never shown blank for existing projects.
           if (formattedEdges.length === 0 && formattedNodes.length > 1) {
+            console.log("ArchitectureMap: no edges from API — synthesizing edges for", formattedNodes.length, "nodes");
             const syntheticEdges = [];
             const defaultStyle = { stroke: "rgba(99,102,241,0.35)", strokeWidth: 1.5 };
             // Linear chain connecting adjacent nodes
@@ -162,6 +170,7 @@ function ArchitectureMap() {
             return true;
           });
 
+          console.log("ArchitectureMap: setting state — nodes:", formattedNodes.length, "edges:", formattedEdges.length);
           setArchNodes(formattedNodes);
           setArchEdges(formattedEdges);
         }
@@ -197,33 +206,32 @@ function ArchitectureMap() {
     return { Current: current };
   }, [archNodes]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(archNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(archEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   // Update ReactFlow nodes/edges when architecture data loads
   useEffect(() => {
-    if (archNodes.length > 0 || archEdges.length > 0) {
-      setNodes(archNodes);
-      setEdges(archEdges);
-    }
+    console.log("ArchitectureMap sync — archNodes:", archNodes.length, "archEdges:", archEdges.length);
+    setNodes(archNodes);
+    setEdges(archEdges);
   }, [archNodes, archEdges, setNodes, setEdges]);
 
 
   // Update node risk scores when version changes
   useEffect(() => {
     const versionRiskScores = versionData[selectedVersion];
-    if (versionRiskScores) {
-      setNodes((nds) =>
-        nds.map((node) => ({
-          ...node,
-          data: {
-            ...node.data,
-            riskScore: versionRiskScores[node.id] || node.data.riskScore,
-          },
-        })),
-      );
-    }
-  }, [selectedVersion, selectedRepository, setNodes]);
+    if (!versionRiskScores) return;
+    setNodes((nds) => {
+      if (nds.length === 0) return nds;
+      return nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          riskScore: versionRiskScores[node.id] || node.data.riskScore,
+        },
+      }));
+    });
+  }, [selectedVersion, versionData, setNodes]);
 
 
 
