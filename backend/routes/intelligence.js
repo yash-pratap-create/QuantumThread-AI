@@ -170,7 +170,9 @@ router.get("/evolution", async (req, res) => {
       featureCount: r.feature_count,
       repository: r.repository || repo,
       commit_hash: r.commit_hash,
-      author: r.author
+      author: r.author,
+      total_commits: r.total_commits ?? null,
+      data_source: r.data_source || 'estimated'
     }));
     res.json(periods);
   } catch (err) {
