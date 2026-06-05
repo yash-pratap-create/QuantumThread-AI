@@ -145,9 +145,9 @@ async function analyzeProject(projectDir, projectName, projectId, repoUrl = null
   // ── Run all 3 AI analyses in parallel ─────────────────
   console.log("📊 [Analyzer] Running AI analyses (modules + security + deps) in parallel...");
 
-  const modulePrompt = `Analyze the modules (folders/components) in this software project. 
-Look at the project structure, configuration files, and source code.
-Identify the main modules, evaluate their bug risks, and return a JSON array.
+  const modulePrompt = `Analyze the modules in this software project.
+You MUST evaluate and use the exact module names from this list:
+${JSON.stringify(moduleNames)}
 
 PROJECT: ${projectName}
 PROJECT DIRECTORY STRUCTURE:
@@ -159,10 +159,10 @@ ${dependencyFilesSummary.slice(0, 8000)}
 KEY CODE SNIPPETS:
 ${codeSnippets.slice(0, 16000)}
 
-Return ONLY a JSON array containing one object per module. Follow these exact keys and types:
+Return ONLY a JSON array containing one object per module in the list. Follow these exact keys and types:
 [
   {
-    "name": "string (e.g. backend, frontend, auth, components, or directory name)",
+    "name": "string (MUST be one of the exact names from the module list above)",
     "risk_score": integer (0 to 100, indicating complexity and risk of bugs),
     "risk_level": "string (low|medium|high)",
     "bug_count": integer (estimated active bugs in this module based on complexity),
@@ -208,7 +208,9 @@ Return ONLY a JSON array of found vulnerabilities. Follow these exact keys and t
 If no security risks or vulnerabilities are found, return a JSON empty array [].
 Do not include any explanation, markdown, backticks, or other text outside the JSON.`;
 
-  const depPrompt = `Analyze the internal dependencies of this project. Identify how the different modules (folders) and major files depend on each other.
+  const depPrompt = `Analyze the internal dependencies of this project.
+You MUST map the dependencies between the exact module names in this list:
+${JSON.stringify(moduleNames)}
 
 PROJECT: ${projectName}
 PROJECT DIRECTORY STRUCTURE:
@@ -220,13 +222,13 @@ ${dependencyFilesSummary.slice(0, 8000)}
 KEY CODE SNIPPETS:
 ${codeSnippets.slice(0, 16000)}
 
-Analyze imports, requires, and structures to find which modules import/use which other modules.
+Determine which modules in the list import/use other modules in the list.
 Return ONLY a JSON array. Each element represents a module and its direct internal dependencies.
 Follow these exact keys and types:
 [
   {
-    "module": "string (matching one of the module names from the project structure)",
-    "direct_deps": ["string (array of other module names that this module directly imports/uses)"]
+    "module": "string (MUST be one of the exact names from the module list above)",
+    "direct_deps": ["string (array of other module names from the module list above that this module directly imports/uses)"]
   }
 ]
 Do not include any explanation, markdown, backticks, or other text outside the JSON.`;
