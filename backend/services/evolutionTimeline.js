@@ -37,11 +37,16 @@ function httpsGet(options) {
 }
 
 function githubOptions(path) {
+  const headers = { 'User-Agent': 'QuantumThread-AI' };
+  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
   return {
     hostname: 'api.github.com',
     path,
     method: 'GET',
-    headers: { 'User-Agent': 'QuantumThread-AI' }
+    headers
   };
 }
 
