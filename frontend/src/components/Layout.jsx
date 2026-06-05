@@ -55,6 +55,7 @@ function Layout({ mode = "project" }) {
   // Fetch projects on mount
   useEffect(() => {
     if (isAssistant) return;
+    setLoadingProjects(true);
     fetchProjects()
       .then((rows) => {
         setProjects(rows);
@@ -80,9 +81,20 @@ function Layout({ mode = "project" }) {
   }, [selectedProject?.name, setSelectedRepository]);
 
   const handleProjectCreated = useCallback((newProject) => {
-    setProjects((prev) => [newProject, ...prev]);
+    // Add to list immediately (even while analyzing)
+    setProjects((prev) => {
+      const exists = prev.some((p) => p.id === newProject.id);
+      return exists ? prev.map((p) => p.id === newProject.id ? { ...p, ...newProject } : p) : [newProject, ...prev];
+    });
     setSelectedProjectId(newProject.id);
     setShowNewProject(false);
+  }, []);
+
+  // Refresh project list from server (used after analysis completes)
+  const refreshProjects = useCallback(() => {
+    fetchProjects()
+      .then((rows) => setProjects(rows))
+      .catch(() => {});
   }, []);
 
   return (
@@ -268,11 +280,11 @@ function Layout({ mode = "project" }) {
                 disabled={loadingProjects || projects.length === 0}
               >
                 {projects.length === 0 && (
-                  <option value="">{loadingProjects ? "Loading…" : "No projects"}</option>
+                  <option value="">{loadingProjects ? "Loading…" : "No projects — click New to add one"}</option>
                 )}
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {p.status === "analyzing" ? `⏳ ${p.name}` : p.status === "error" ? `❌ ${p.name}` : p.name}
                   </option>
                 ))}
               </select>
@@ -411,6 +423,7 @@ function Layout({ mode = "project" }) {
         <NewProjectModal
           onClose={() => setShowNewProject(false)}
           onCreated={handleProjectCreated}
+          onAnalysisComplete={refreshProjects}
         />
       )}
     </div>
@@ -420,7 +433,7 @@ function Layout({ mode = "project" }) {
 // ═══════════════════════════════════════════════════════
 // NEW PROJECT MODAL — Upload from PC or GitHub URL
 // ═══════════════════════════════════════════════════════
-function NewProjectModal({ onClose, onCreated }) {
+function NewProjectModal({ onClose, onCreated, onAnalysisComplete }) {
   const [tab, setTab] = useState("upload"); // "upload" | "github"
   const [githubUrl, setGithubUrl] = useState("");
   const [file, setFile] = useState(null);
@@ -456,11 +469,14 @@ function NewProjectModal({ onClose, onCreated }) {
         const s = await fetchProjectStatus(projectId);
         if (s.status === "ready") {
           setStatus("ready");
+          // Update the project in the parent list with ready status
           onCreated({ ...project, status: "ready" });
+          if (onAnalysisComplete) onAnalysisComplete();
         } else if (s.status === "error") {
           setStatus("error");
           setError("Analysis failed. Project was created but analysis encountered an error.");
           setSaving(false);
+          onCreated({ ...project, status: "error" });
         } else {
           setTimeout(poll, 3000);
         }
@@ -469,7 +485,7 @@ function NewProjectModal({ onClose, onCreated }) {
       }
     };
     poll();
-  }, [onCreated]);
+  }, [onCreated, onAnalysisComplete]);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -485,6 +501,9 @@ function NewProjectModal({ onClose, onCreated }) {
         if (!githubUrl.trim()) { setError("Enter a GitHub URL"); setSaving(false); setStatus(null); return; }
         project = await importGithub(githubUrl.trim());
       }
+
+      // Add project to sidebar immediately (while still analyzing)
+      onCreated({ ...project, status: "analyzing" });
 
       // Start polling for analysis completion
       pollStatus(project.id, project);
