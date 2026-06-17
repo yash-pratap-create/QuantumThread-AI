@@ -10,7 +10,7 @@ Language composition (approx.)
 ---
 ## 🚀 Live Demo
 
-🔗 https://testing.d1r055b08h2njg.amplifyapp.com/#
+🔗 https://testing.d1r055b08h2njg.amplifyapp.com/
 
 ## Features
 
