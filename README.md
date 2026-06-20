@@ -1,6 +1,6 @@
-# QuantamThread-AI
+# QuantumThread-AI
 
-QuantamThread-AI is an AI-first project focused on threaded conversational utilities and tooling. The codebase is primarily JavaScript with some Java components used for specialized modules. This repository provides the core application, utilities, and integration code for building AI-assisted threading and conversational features.
+QuantumThread-AI is an AI-first project focused on threaded conversational utilities and tooling. The codebase is primarily JavaScript with some Java components used for specialized modules. This repository provides the core application, utilities, and integration code for building AI-assisted threading and conversational features.
 
 Language composition (approx.)
 - JavaScript: ~86%
